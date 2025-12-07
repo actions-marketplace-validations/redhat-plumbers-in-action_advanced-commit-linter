@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach, test } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 import {
   ICommitTestContext,
   commitContextFixture,
+  upstreamWithException,
 } from './fixtures/commit.fixture';
 import { validatorContextFixture } from './fixtures/validation/validator.fixture';
+import { Commit } from '../../src/commit';
 
 describe('Commit Object', () => {
   beforeEach<ICommitTestContext>(context => {
@@ -56,11 +58,11 @@ describe('Commit Object', () => {
         "sha": "1111111111111111111111111111111111111111",
         "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
         "validation": {
-          "message": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_",
+          "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |",
           "status": "success",
           "tracker": {
             "data": [],
-            "message": "\`_no-tracker_\`",
+            "message": "_no tracker_",
             "status": "success",
           },
           "upstream": {
@@ -105,7 +107,7 @@ describe('Commit Object', () => {
         "sha": "1111111111111111111111111111111111111111",
         "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
         "validation": {
-          "message": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_",
+          "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |",
           "status": "success",
           "tracker": {
             "data": [
@@ -113,6 +115,7 @@ describe('Commit Object', () => {
                 "data": {
                   "id": "123",
                   "keyword": "Resolves: #",
+                  "type": "bugzilla",
                   "url": "https://bugzilla.redhat.com/show_bug.cgi?id=123",
                 },
                 "exception": "github-only",
@@ -164,11 +167,11 @@ describe('Commit Object', () => {
         "sha": "1111111111111111111111111111111111111111",
         "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
         "validation": {
-          "message": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\` upstream-url upstream-url",
+          "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |",
           "status": "success",
           "tracker": {
             "data": [],
-            "message": "\`_no-tracker_\`",
+            "message": "_no tracker_",
             "status": "success",
           },
           "upstream": {
@@ -203,13 +206,7 @@ describe('Commit Object', () => {
     expect(validated.validation.tracker?.status).toEqual('success');
     expect(validated.validation.upstream?.status).toEqual('success');
 
-    expect(
-      (
-        await context['systemd-rhel-policy'].validate(
-          validatorContextFixture['systemd-rhel-policy']
-        )
-      ).validated
-    ).toMatchInlineSnapshot(`
+    expect(validated).toMatchInlineSnapshot(`
       {
         "message": {
           "body": "feat: add new feature
@@ -231,7 +228,7 @@ describe('Commit Object', () => {
         "sha": "1111111111111111111111111111111111111111",
         "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
         "validation": {
-          "message": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\` upstream-url upstream-url",
+          "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |",
           "status": "success",
           "tracker": {
             "data": [
@@ -239,20 +236,74 @@ describe('Commit Object', () => {
                 "data": {
                   "id": "123",
                   "keyword": "Resolves: #",
+                  "type": "bugzilla",
                   "url": "https://bugzilla.redhat.com/show_bug.cgi?id=123",
                 },
                 "exception": "github-only",
               },
               {
-                "data": {
-                  "id": "",
-                  "keyword": "",
-                },
                 "exception": "github-only",
               },
             ],
-            "message": "[123](https://bugzilla.redhat.com/show_bug.cgi?id=123), [](undefined)",
+            "message": "[123](https://bugzilla.redhat.com/show_bug.cgi?id=123), github-only",
             "status": "success",
+          },
+          "upstream": {
+            "data": [
+              {
+                "repo": "systemd/systemd",
+                "sha": "upstream-sha",
+                "url": "upstream-url",
+              },
+              {
+                "repo": "systemd/systemd-stable",
+                "sha": "upstream-sha",
+                "url": "upstream-url",
+              },
+            ],
+            "exception": "rhel-only",
+            "status": "success",
+          },
+        },
+      }
+    `);
+  });
+
+  it<ICommitTestContext>('can validate commit with systemd-rhel configuration - bad commits', async context => {
+    const validated = (
+      await new Commit(upstreamWithException).validate(
+        validatorContextFixture['systemd-rhel-policy']
+      )
+    ).validated;
+
+    expect(validated.validation.status).toEqual('failure');
+    expect(validated.validation.tracker?.status).toEqual('failure');
+    expect(validated.validation.upstream?.status).toEqual('success');
+
+    expect(validated).toMatchInlineSnapshot(`
+      {
+        "message": {
+          "body": "feat: add new feature
+
+      rhel-only
+
+      (cherry picked from commit 2222222222222222222222222222222222222222)",
+          "cherryPick": [
+            {
+              "sha": "2222222222222222222222222222222222222222",
+            },
+          ],
+          "title": "feat: add new feature",
+        },
+        "sha": "1111111111111111111111111111111111111111",
+        "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
+        "validation": {
+          "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | **Missing issue tracker** ✋ |",
+          "status": "failure",
+          "tracker": {
+            "data": [],
+            "message": "**Missing issue tracker** ✋",
+            "status": "failure",
           },
           "upstream": {
             "data": [

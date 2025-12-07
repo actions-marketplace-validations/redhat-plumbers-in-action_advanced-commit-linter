@@ -1,10 +1,11 @@
-import { Context } from 'probot';
+import { debug, getInput } from '@actions/core';
+import { context } from '@actions/github';
 
-import { events } from './events';
-import { configSchema, ConfigT } from './schema/config';
+import { CustomOctokit } from './octokit';
+import { configSchema, ConfigPolicy } from './schema/config';
 
 export class Config {
-  policy: ConfigT['policy'];
+  policy: ConfigPolicy;
 
   constructor(config: unknown) {
     this.policy = configSchema.parse(config).policy;
@@ -26,12 +27,14 @@ export class Config {
     return this.policy['cherry-pick'].upstream.length === 0;
   }
 
-  static async getConfig(
-    context: {
-      [K in keyof typeof events]: Context<(typeof events)[K][number]>;
-    }[keyof typeof events]
-  ): Promise<Config> {
-    const retrievedConfig = await context.config('advanced-commit-linter.yml');
+  static async getConfig(octokit: CustomOctokit): Promise<Config> {
+    const path = getInput('config-path', { required: true });
+
+    const retrievedConfig = (
+      await octokit.config.get({ ...context.repo, path })
+    ).config;
+
+    debug(`Configuration '${path}': ${JSON.stringify(retrievedConfig)}`);
 
     if (Config.isConfigEmpty(retrievedConfig)) {
       throw new Error(

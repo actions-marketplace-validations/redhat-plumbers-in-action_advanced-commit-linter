@@ -1,3 +1,5 @@
+import { debug, getInput } from '@actions/core';
+import { context } from '@actions/github';
 import { configSchema } from './schema/config';
 export class Config {
     constructor(config) {
@@ -15,8 +17,10 @@ export class Config {
     isCherryPickPolicyEmpty() {
         return this.policy['cherry-pick'].upstream.length === 0;
     }
-    static async getConfig(context) {
-        const retrievedConfig = await context.config('advanced-commit-linter.yml');
+    static async getConfig(octokit) {
+        const path = getInput('config-path', { required: true });
+        const retrievedConfig = (await octokit.config.get(Object.assign(Object.assign({}, context.repo), { path }))).config;
+        debug(`Configuration '${path}': ${JSON.stringify(retrievedConfig)}`);
         if (Config.isConfigEmpty(retrievedConfig)) {
             throw new Error(`Missing configuration. Please setup 'Advanced Commit Linter' Action using 'advanced-commit-linter.yml' file.`);
         }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { singleCommitMetadataSchema } from './input';
+import { configTrackerTypeSchema } from './config';
 const statusSchema = z.union([z.literal('success'), z.literal('failure')]);
 const trackerSchema = z.object({
     exception: z.string().optional(),
@@ -7,18 +8,20 @@ const trackerSchema = z.object({
         .object({
         keyword: z.string(),
         id: z.string(),
+        type: z.union([configTrackerTypeSchema, z.literal('unknown')]),
         url: z.string().optional(),
     })
         .optional(),
 });
+export const upstreamDataSchema = z.object({
+    sha: z.string(),
+    repo: z.string(),
+    url: z.string(),
+});
 const upstreamSchema = z.object({
     status: statusSchema,
     exception: z.string().optional(),
-    data: z.array(z.object({
-        sha: z.string(),
-        repo: z.string(),
-        url: z.string(),
-    })),
+    data: z.array(upstreamDataSchema),
 });
 const validatedCommitSchema = z.object({
     status: statusSchema,
@@ -39,6 +42,7 @@ export const outputValidatedPullRequestMetadataSchema = z.object({
         tracker: z
             .object({
             id: z.string().optional(),
+            type: z.union([configTrackerTypeSchema, z.literal('unknown')]),
             url: z.string().optional(),
             message: z.string(),
             exception: z.string().optional(),

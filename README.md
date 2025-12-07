@@ -28,7 +28,7 @@
 
 <!-- -->
 
-Advanced Commit Linter is a GitHub Action that lint commit messages of PR. It checks for issue trackers and upstream references. Results are displayed as a status check and Pull Request comment.
+Advanced Commit Linter is a GitHub Action that lint commit messages of PR. It checks for issue trackers and upstream references. Results can be displayed as a status check or Pull Request comment when used together with [issue-commentator](https://github.com/redhat-plumbers-in-action/issue-commentator) GitHub Action.
 
 ## How does it work
 
@@ -43,7 +43,6 @@ TBA
 
 * Tracker references validator
 * Upstream references (cherry-pick) validator
-* Summary comment on Pull Request
 
 ## Usage
 
@@ -53,8 +52,9 @@ To set up Advanced Commit Linter, we need three files:
 * Workflow that runs on `workflow-run` trigger, downloads artifact, and runs `advanced-commit-linter` GitHub Action
 * `advanced-commit-linter.yml` configuration
 
-<!-- markdownlint-disable MD013 -->
-> **Note**: Setup is complicated due to GitHub [permissions on `GITHUB_TOKEN`](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token). When used in workflow executed from fork it has `read-only` permissions. By using the `workflow-run` trigger we are able to [safely overcome this limitation](https://securitylab.github.com/research/github-actions-preventing-pwn-requests/) and it allows us to comment on Pull Requests.
+> [!NOTE]
+>
+> Setup is complicated due to GitHub [permissions on `GITHUB_TOKEN`](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token). When used in workflow executed from fork it has `read-only` permissions. By using the `workflow-run` trigger we are able to [safely overcome this limitation](https://securitylab.github.com/research/github-actions-preventing-pwn-requests/) and it allows us to comment on Pull Requests.
 
 ```yml
 policy:
@@ -69,6 +69,7 @@ policy:
     - keyword:
         - 'Resolves: #'
         - 'Related: #'
+      type: bugzilla
       issue-format:
         - '[0-9]+$'
       url: 'https://bugzilla.redhat.com/show_bug.cgi?id='
@@ -78,6 +79,7 @@ policy:
     - keyword:
         - 'Resolves: '
         - 'Related: '
+      type: jira
       issue-format:
         - 'JIRA-1234'
       url: 'https://issues.redhat.com/browse/'
@@ -151,10 +153,8 @@ jobs:
       validated-pr-metadata: ${{ steps.commit-linter.outputs.validated-pr-metadata }}
 
     permissions:
-      # required for commit statuses
-      statuses: write
-      # required for PR comments
-      pull-requests: write
+      # required for creation of checks
+      checks: write
 
     steps:
       - id: commit-linter
@@ -174,8 +174,11 @@ Action currently accepts the following options:
 
 - uses: redhat-plumbers-in-action/advanced-commit-linter@v1
   with:
-    pr-metadata: <pr-metadata.json>
-    token:       <GitHub token or PAT>
+    pr-metadata:    <pr-metadata.json>
+    config-path:    <path to config file>
+    set-status:     <true or false>
+    status-title:  <h3 title of status message>
+    token:          <GitHub token or PAT>
 
 # ...
 ```
@@ -189,14 +192,35 @@ Pull Request metadata has the following format: [metadata format](https://github
 * default value: `undefined`
 * requirements: `required`
 
+### config-path
+
+Path to configuration file. Configuration file format is described in: [Policy section](#policy).
+
+* default value: `.github/advanced-commit-linter.yml`
+* requirements: `optional`
+
+### set-status
+
+Set status on Pull Request. If enabled, Action will create check-run with validation results.
+
+* default value: `false`
+* requirements: `optional`
+
+### status-title
+
+Optional H3 title of status message.
+
+* default value: `Commit validation`
+* requirements: `optional`
+
 ### token
 
-GitHub token or PAT is used for creating comments on Pull Request and setting commit statuses.
+GitHub token or PAT is used for setting status checks on Pull Request.
 
 ```yml
 # required permission
 permissions:
-  statuses: write
+  checks: write
   pull-requests: write
 ```
 
@@ -221,6 +245,7 @@ policy:
     - keyword:
         - 'Resolves: #'
         - 'Related: #'
+      type: bugzilla
       issue-format:
         - '[0-9]+$'
       url: 'https://bugzilla.redhat.com/show_bug.cgi?id='
@@ -230,8 +255,9 @@ policy:
     - keyword:
         - 'Resolves: '
         - 'Related: '
+      type: jira
       issue-format:
-        - 'JIRA-1234'
+        - 'RHELPLAN-\d+$'
       url: 'https://issues.redhat.com/browse/'
       exception:
         note:
@@ -270,6 +296,14 @@ Keyword that prefixes tracker identificator.
 * requirements: `required`
 * example: `Fixes:`
 
+### `tracker[].type` keyword
+
+Type of tracker. Data can be used by postprocessing scripts/GitHub Actions.
+
+Currently supproted types of trackers are: `bugzilla`, `jira` and `unknown`.
+
+* requirements: `required`
+
 ### `tracker[].issue-format` keyword
 
 Regex that describes identificator of given tracker.
@@ -294,4 +328,148 @@ Property that describes possible exceptions for referencing trackers in commit m
 
 ### validated-pr-metadata
 
-TBA
+<details>
+  <summary>Example of validated metadata object</summary>
+
+  ```ts
+  const metadata = {
+    number: 15,
+    labels: [
+      {
+        id: 5610751380,
+        name: 'bug',
+        description: 'Bug label',
+      },
+    ],
+    milestone: {},
+    commits: [
+      {
+        sha: 'b145cbd729d33cc50d299079a9a5c643531ad053',
+        url: 'https://github.com/redhat-plumbers-in-action/advanced-commit-linter/commit/b145cbd729d33cc50d299079a9a5c643531ad053',
+        message: {
+          title: 'fix Typo in README.md',
+          body: 'fix: typo\
+  \
+  rhel-only\
+  \
+  Related: RHELPLAN-1234',
+          cherryPick: [],
+        },
+        validation: {
+          status: 'success',
+          message:
+            '| https://github.com/redhat-plumbers-in-action/advanced-commit-linter/commit/b145cbd729d33cc50d299079a9a5c643531ad053 - _fix: typo_ | `rhel-only` |',
+          tracker: {
+            status: 'success',
+            message:
+              '[RHELPLAN-1234](https://issues.redhat.com/browse/RHELPLAN-1234)',
+            data: [
+              {
+                data: {
+                  keyword: 'Related: ',
+                  id: 'RHELPLAN-1234',
+                  type: 'jira',
+                  url: 'https://issues.redhat.com/browse/RHELPLAN-1234',
+                },
+              },
+            ],
+          },
+          upstream: {
+            data: [],
+            status: 'success',
+            exception: 'rhel-only',
+          },
+        },
+      },
+    ],
+    validation: {
+      status: 'success',
+      tracker: {
+        message: 'Tracker found',
+        type: 'unknown',
+        id: 'RHELPLAN-1234',
+        url: 'https://issues.redhat.com/browse/RHELPLAN-1234',
+      },
+      message:
+        'Tracker - [RHELPLAN-1234](https://issues.redhat.com/browse/RHELPLAN-1234)\
+  \
+  #### The following commits meet all requirements\
+  \
+  | commit | upstream |\
+  |---|---|\
+  | https://github.com/redhat-plumbers-in-action/advanced-commit-linter/commit/b145cbd729d33cc50d299079a9a5c643531ad053 - _fix: typo_ | `rhel-only` |',
+    },
+  };
+  ```
+
+</details>
+
+#### `commits[].validation.status` keyword
+
+Status of commit validation. Can be one of the following values:
+
+* `success` - commit meets all requirements
+* `failure` - commit does not meet all requirements
+
+#### `commits[].validation.message` keyword
+
+Message that describes commit validation status.
+
+#### `commits[].validation.tracker` keyword
+
+Object that describes all trackers detected in commit message and their validation status.
+
+```ts
+tracker: {
+  status: 'success',
+  message: '[RHELPLAN-1234](https://issues.redhat.com/browse/RHELPLAN-1234)',
+  data: [{
+    data: {
+      keyword: 'Related: ',
+      id: 'RHELPLAN-1234',
+      type: 'jira',
+      url: 'https://issues.redhat.com/browse/RHELPLAN-1234',
+    },
+  }],
+}
+```
+
+#### `commits[].validation.upstream` keyword
+
+Object that describes all upstreams detected in commit message and their validation status.
+
+```ts
+upstream: {
+  data: [{
+    sha: 'b145cbd729d33cc50d299079a9a5c643531ad053',
+    repo: 'systemd/systemd',
+    url: 'https://github.com/systemd/systemd/commit/b145cbd729d33cc50d299079a9a5c643531ad053',
+  }],
+  status: 'success',
+  exception: 'rhel-only',
+}
+```
+
+#### `validation` keyword
+
+Object that describes overall validation status of all commits in Pull Request.
+
+```ts
+validation: {
+  status: 'success',
+  tracker: {
+    message: 'Tracker found',
+    type: 'unknown',
+    id: 'RHELPLAN-1234',
+    url: 'https://issues.redhat.com/browse/RHELPLAN-1234',
+  },
+  message:
+    'Tracker - [RHELPLAN-1234](https://issues.redhat.com/browse/RHELPLAN-1234)\
+\
+#### The following commits meet all requirements\
+\
+| commit | upstream |\
+|---|---|\
+| https://github.com/redhat-plumbers-in-action/advanced-commit-linter/commit/b145cbd729d33cc50d299079a9a5c643531ad053 - _fix: typo_ | `rhel-only` |',
+}
+```

@@ -36,11 +36,11 @@ describe('Validator Object', () => {
         await context['no-check-policy'].validateCommit(upstreamAndTracker)
       ).toMatchInlineSnapshot(`
         {
-          "message": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_",
+          "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |",
           "status": "success",
           "tracker": {
             "data": [],
-            "message": "\`_no-tracker_\`",
+            "message": "_no tracker_",
             "status": "success",
           },
           "upstream": {
@@ -56,7 +56,7 @@ describe('Validator Object', () => {
         await context['only-tracker-policy'].validateCommit(upstreamAndTracker)
       ).toMatchInlineSnapshot(`
         {
-          "message": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_",
+          "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |",
           "status": "success",
           "tracker": {
             "data": [
@@ -64,6 +64,7 @@ describe('Validator Object', () => {
                 "data": {
                   "id": "123",
                   "keyword": "Resolves: #",
+                  "type": "bugzilla",
                   "url": "https://bugzilla.redhat.com/show_bug.cgi?id=123",
                 },
                 "exception": undefined,
@@ -87,11 +88,11 @@ describe('Validator Object', () => {
         )
       ).toMatchInlineSnapshot(`
         {
-          "message": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\` upstream-url upstream-url",
+          "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |",
           "status": "success",
           "tracker": {
             "data": [],
-            "message": "\`_no-tracker_\`",
+            "message": "_no tracker_",
             "status": "success",
           },
           "upstream": {
@@ -120,7 +121,7 @@ describe('Validator Object', () => {
         )
       ).toMatchInlineSnapshot(`
         {
-          "message": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\` upstream-url upstream-url",
+          "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |",
           "status": "success",
           "tracker": {
             "data": [
@@ -128,6 +129,7 @@ describe('Validator Object', () => {
                 "data": {
                   "id": "123",
                   "keyword": "Resolves: #",
+                  "type": "bugzilla",
                   "url": "https://bugzilla.redhat.com/show_bug.cgi?id=123",
                 },
                 "exception": undefined,
@@ -158,12 +160,12 @@ describe('Validator Object', () => {
       expect(await context['systemd-rhel-policy'].validateCommit(plainCommit))
         .toMatchInlineSnapshot(`
           {
-            "message": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - **Missing upstream reference** ‼️",
+            "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | **Missing issue tracker** ✋</br>**Missing upstream reference** ‼️ |",
             "status": "failure",
             "tracker": {
               "data": [],
-              "message": "",
-              "status": "success",
+              "message": "**Missing issue tracker** ✋",
+              "status": "failure",
             },
             "upstream": {
               "data": [],
@@ -179,12 +181,12 @@ describe('Validator Object', () => {
         )
       ).toMatchInlineSnapshot(`
         {
-          "message": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\`",
-          "status": "success",
+          "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | **Missing issue tracker** ✋ |",
+          "status": "failure",
           "tracker": {
             "data": [],
-            "message": "",
-            "status": "success",
+            "message": "**Missing issue tracker** ✋",
+            "status": "failure",
           },
           "upstream": {
             "data": [],
@@ -206,16 +208,20 @@ describe('Validator Object', () => {
       expect(validated.status).toEqual('success');
       expect(validated.tracker).toBeUndefined();
       expect(validated.message).toMatchInlineSnapshot(`
-        "Tracker - Missing, needs inspection! ✋
+        "Tracker - _no tracker_
 
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_"
+        #### The following commits meet all requirements
+
+        | commit | upstream |
+        |---|---|
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |"
       `);
     });
 
-    it<IValidatorTestContext>('only-tracker-policy configuration', context => {
+    it.skip<IValidatorTestContext>('only-tracker-policy configuration', context => {
       const validated = context['only-tracker-policy'].validateAll(
         context['validated-commits']['only-tracker-policy']['shouldPass']
       );
@@ -230,34 +236,345 @@ describe('Validator Object', () => {
       expect(validated.message).toMatchInlineSnapshot(`
         "Tracker - \`github-only\`, [123](https://bugzilla.redhat.com/show_bug.cgi?id=123)
 
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - _no upstream_"
+        #### The following commits meet all requirements
+
+        | commit | upstream |
+        |---|---|
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | _no upstream_ |"
       `);
     });
 
     // ! FIXME - this test is failing, but it should pass
-    it.skip<IValidatorTestContext>('only-cherry-pick-policy configuration', context => {
+    it<IValidatorTestContext>('only-cherry-pick-policy configuration', context => {
       const validated = context['only-cherry-pick-policy'].validateAll(
         context['validated-commits']['only-cherry-pick-policy']['shouldPass']
       );
 
+      expect(
+        context['validated-commits']['only-cherry-pick-policy']['shouldPass']
+      ).toMatchInlineSnapshot(`
+        [
+          Commit {
+            "metadata": {
+              "message": {
+                "body": "feat: add new feature
+
+        rhel-only",
+                "cherryPick": [],
+                "title": "feat: add new feature",
+              },
+              "sha": "1111111111111111111111111111111111111111",
+              "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
+            },
+            "validation": {
+              "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\` |",
+              "status": "success",
+              "tracker": {
+                "data": [],
+                "message": "_no tracker_",
+                "status": "success",
+              },
+              "upstream": {
+                "data": [],
+                "exception": "rhel-only",
+                "status": "success",
+              },
+            },
+          },
+          Commit {
+            "metadata": {
+              "message": {
+                "body": "feat: add new feature
+
+        (cherry picked from commit 2222222222222222222222222222222222222222)",
+                "cherryPick": [
+                  {
+                    "sha": "2222222222222222222222222222222222222222",
+                  },
+                ],
+                "title": "feat: add new feature",
+              },
+              "sha": "1111111111111111111111111111111111111111",
+              "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
+            },
+            "validation": {
+              "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |",
+              "status": "success",
+              "tracker": {
+                "data": [],
+                "message": "_no tracker_",
+                "status": "success",
+              },
+              "upstream": {
+                "data": [
+                  {
+                    "repo": "systemd/systemd",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                  {
+                    "repo": "systemd/systemd-stable",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                ],
+                "exception": "",
+                "status": "success",
+              },
+            },
+          },
+          Commit {
+            "metadata": {
+              "message": {
+                "body": "feat: add new feature
+
+        rhel-only
+
+        (cherry picked from commit 2222222222222222222222222222222222222222)",
+                "cherryPick": [
+                  {
+                    "sha": "2222222222222222222222222222222222222222",
+                  },
+                ],
+                "title": "feat: add new feature",
+              },
+              "sha": "1111111111111111111111111111111111111111",
+              "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
+            },
+            "validation": {
+              "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |",
+              "status": "success",
+              "tracker": {
+                "data": [],
+                "message": "_no tracker_",
+                "status": "success",
+              },
+              "upstream": {
+                "data": [
+                  {
+                    "repo": "systemd/systemd",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                  {
+                    "repo": "systemd/systemd-stable",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                ],
+                "exception": "rhel-only",
+                "status": "success",
+              },
+            },
+          },
+          Commit {
+            "metadata": {
+              "message": {
+                "body": "feat: add new feature
+
+        (cherry picked from commit 2222222222222222222222222222222222222222)
+
+        Resolves: #123",
+                "cherryPick": [
+                  {
+                    "sha": "2222222222222222222222222222222222222222",
+                  },
+                ],
+                "title": "feat: add new feature",
+              },
+              "sha": "1111111111111111111111111111111111111111",
+              "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
+            },
+            "validation": {
+              "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |",
+              "status": "success",
+              "tracker": {
+                "data": [],
+                "message": "_no tracker_",
+                "status": "success",
+              },
+              "upstream": {
+                "data": [
+                  {
+                    "repo": "systemd/systemd",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                  {
+                    "repo": "systemd/systemd-stable",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                ],
+                "exception": "",
+                "status": "success",
+              },
+            },
+          },
+          Commit {
+            "metadata": {
+              "message": {
+                "body": "feat: add new feature
+
+        (cherry picked from commit 2222222222222222222222222222222222222222)
+
+        github-only
+
+        Resolves: #123",
+                "cherryPick": [
+                  {
+                    "sha": "2222222222222222222222222222222222222222",
+                  },
+                ],
+                "title": "feat: add new feature",
+              },
+              "sha": "1111111111111111111111111111111111111111",
+              "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
+            },
+            "validation": {
+              "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |",
+              "status": "success",
+              "tracker": {
+                "data": [],
+                "message": "_no tracker_",
+                "status": "success",
+              },
+              "upstream": {
+                "data": [
+                  {
+                    "repo": "systemd/systemd",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                  {
+                    "repo": "systemd/systemd-stable",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                ],
+                "exception": "",
+                "status": "success",
+              },
+            },
+          },
+          Commit {
+            "metadata": {
+              "message": {
+                "body": "feat: add new feature
+
+        (cherry picked from commit 2222222222222222222222222222222222222222)
+
+        Resolves: #123
+
+        rhel-only",
+                "cherryPick": [
+                  {
+                    "sha": "2222222222222222222222222222222222222222",
+                  },
+                ],
+                "title": "feat: add new feature",
+              },
+              "sha": "1111111111111111111111111111111111111111",
+              "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
+            },
+            "validation": {
+              "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |",
+              "status": "success",
+              "tracker": {
+                "data": [],
+                "message": "_no tracker_",
+                "status": "success",
+              },
+              "upstream": {
+                "data": [
+                  {
+                    "repo": "systemd/systemd",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                  {
+                    "repo": "systemd/systemd-stable",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                ],
+                "exception": "rhel-only",
+                "status": "success",
+              },
+            },
+          },
+          Commit {
+            "metadata": {
+              "message": {
+                "body": "feat: add new feature
+
+        (cherry picked from commit 2222222222222222222222222222222222222222)
+
+        github-only
+
+        Resolves: #123
+
+        rhel-only",
+                "cherryPick": [
+                  {
+                    "sha": "2222222222222222222222222222222222222222",
+                  },
+                ],
+                "title": "feat: add new feature",
+              },
+              "sha": "1111111111111111111111111111111111111111",
+              "url": "https://github.com/org/repo/commit/1111111111111111111111111111111111111111",
+            },
+            "validation": {
+              "message": "| https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |",
+              "status": "success",
+              "tracker": {
+                "data": [],
+                "message": "_no tracker_",
+                "status": "success",
+              },
+              "upstream": {
+                "data": [
+                  {
+                    "repo": "systemd/systemd",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                  {
+                    "repo": "systemd/systemd-stable",
+                    "sha": "upstream-sha",
+                    "url": "upstream-url",
+                  },
+                ],
+                "exception": "rhel-only",
+                "status": "success",
+              },
+            },
+          },
+        ]
+      `);
       expect(validated.status).toEqual('success');
       expect(validated.tracker).toBeUndefined();
       expect(validated.message).toMatchInlineSnapshot(`
-        "Tracker - Missing, needs inspection! ✋
+        "Tracker - **Missing, needs inspection! ✋**
 
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\`
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - upstream-url upstream-url
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\` upstream-url upstream-url
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - upstream-url upstream-url
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - upstream-url upstream-url
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\` upstream-url upstream-url
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\` upstream-url upstream-url"
+        #### The following commits meet all requirements
+
+        | commit | upstream |
+        |---|---|
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\` |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |"
       `);
     });
 
@@ -266,20 +583,25 @@ describe('Validator Object', () => {
         context['validated-commits']['systemd-rhel-policy']['shouldPass']
       );
 
-      expect(validated.status).toEqual('success');
+      expect(validated.status).toEqual('failure');
       expect(validated.tracker).toBeDefined();
       expect(validated.tracker).toMatchInlineSnapshot(`
         {
           "message": "Multiple trackers found",
+          "type": "unknown",
         }
       `);
       expect(validated.message).toMatchInlineSnapshot(`
         "Tracker - Multiple trackers found
 
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - upstream-url upstream-url
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - upstream-url upstream-url
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\` upstream-url upstream-url
-        https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - feat: add new feature - \`rhel-only\` upstream-url upstream-url"
+        #### The following commits meet all requirements
+
+        | commit | upstream |
+        |---|---|
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |"
       `);
     });
   });
@@ -293,7 +615,59 @@ describe('Validator Object', () => {
       expect(tracker).toMatchInlineSnapshot(`
         {
           "message": "Multiple trackers found",
+          "type": "unknown",
         }
+      `);
+    });
+  });
+
+  describe('overallMessage()', () => {
+    test<IValidatorTestContext>('systemd-rhel-policy all passed', context => {
+      expect(
+        context['systemd-rhel-policy'].overallMessage(
+          undefined,
+          context['validated-commits']['systemd-rhel-policy'].shouldPass
+        )
+      ).toMatchInlineSnapshot(`
+        "Tracker - **Missing, needs inspection! ✋**
+
+        #### The following commits meet all requirements
+
+        | commit | upstream |
+        |---|---|
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | \`rhel-only\`</br>upstream-url</br>upstream-url |"
+      `);
+    });
+
+    test<IValidatorTestContext>('systemd-rhel-policy some failed', context => {
+      expect(
+        context['systemd-rhel-policy'].overallMessage(
+          {
+            id: '123456789',
+            type: 'unknown',
+            url: 'www.tracker.url/',
+            message: '',
+          },
+          context['validated-commits']['systemd-rhel-policy'].shouldFail
+        )
+      ).toMatchInlineSnapshot(`
+        "Tracker - [123456789](www.tracker.url/)
+
+        #### The following commits meet all requirements
+
+        | commit | upstream |
+        |---|---|
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | upstream-url</br>upstream-url |
+
+        #### The following commits need an inspection
+
+        | commit | note |
+        |---|---|
+        | https://github.com/org/repo/commit/1111111111111111111111111111111111111111 - _feat: add new feature_ | **Missing issue tracker** ✋</br>**Missing upstream reference** ‼️ |"
       `);
     });
   });

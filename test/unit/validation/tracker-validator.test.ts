@@ -4,6 +4,7 @@ import {
   ITrackerValidatorTestContext,
   trackerValidatorContextFixture,
 } from '../fixtures/validation/tracker-validator.fixture';
+import { TrackerValidator } from '../../../src/validation/tracker-validator';
 
 describe('Tracker Validator Object', () => {
   beforeEach<ITrackerValidatorTestContext>(context => {
@@ -29,10 +30,6 @@ describe('Tracker Validator Object', () => {
         })
       ).toMatchInlineSnapshot(`
         {
-          "data": {
-            "id": "",
-            "keyword": "",
-          },
           "exception": undefined,
         }
       `);
@@ -54,6 +51,7 @@ describe('Tracker Validator Object', () => {
           "data": {
             "id": "789",
             "keyword": "Resolves: #",
+            "type": "bugzilla",
             "url": "https://bugzilla.redhat.com/show_bug.cgi?id=789",
           },
           "exception": undefined,
@@ -74,10 +72,6 @@ describe('Tracker Validator Object', () => {
         })
       ).toMatchInlineSnapshot(`
         {
-          "data": {
-            "id": "",
-            "keyword": "",
-          },
           "exception": "github-only",
         }
       `);
@@ -99,11 +93,170 @@ describe('Tracker Validator Object', () => {
           "data": {
             "id": "789",
             "keyword": "Resolves: #",
+            "type": "bugzilla",
             "url": "https://bugzilla.redhat.com/show_bug.cgi?id=789",
           },
           "exception": "github-only",
         }
       `);
+    });
+
+    test('cleanArray()', context => {
+      expect(
+        TrackerValidator.cleanArray({
+          message: 'message',
+          status: 'success',
+          data: [
+            {
+              data: {
+                keyword: 'keyword',
+                type: 'unknown',
+                id: '123',
+              },
+            },
+            {
+              data: {
+                keyword: 'keyword',
+                type: 'unknown',
+                id: '123',
+              },
+            },
+            {
+              data: {
+                keyword: 'keyword',
+                type: 'unknown',
+                id: '456',
+              },
+            },
+            {
+              data: {
+                keyword: 'keyword',
+                type: 'unknown',
+                id: '456',
+              },
+              exception: 'exception',
+            },
+            {
+              exception: 'exception',
+            },
+            {},
+            {},
+          ],
+        })
+      ).toMatchInlineSnapshot(`
+        {
+          "data": [
+            {
+              "data": {
+                "id": "123",
+                "keyword": "keyword",
+                "type": "unknown",
+              },
+            },
+            {
+              "data": {
+                "id": "123",
+                "keyword": "keyword",
+                "type": "unknown",
+              },
+            },
+            {
+              "data": {
+                "id": "456",
+                "keyword": "keyword",
+                "type": "unknown",
+              },
+            },
+            {
+              "data": {
+                "id": "456",
+                "keyword": "keyword",
+                "type": "unknown",
+              },
+              "exception": "exception",
+            },
+            {
+              "exception": "exception",
+            },
+          ],
+          "message": "message",
+          "status": "success",
+        }
+      `);
+    });
+
+    test('getMessage()', context => {
+      expect(
+        TrackerValidator.getMessage([], 'failure', false)
+      ).toMatchInlineSnapshot('"**Missing issue tracker** ✋"');
+
+      expect(
+        TrackerValidator.getMessage(
+          [
+            {
+              exception: 'github-only',
+              data: {
+                id: '123',
+                keyword: 'Resolves: #',
+                type: 'bugzilla',
+                url: 'https://bugzilla.redhat.com/show_bug.cgi?id=123',
+              },
+            },
+          ],
+          'success',
+          false
+        )
+      ).toMatchInlineSnapshot(
+        '"[123](https://bugzilla.redhat.com/show_bug.cgi?id=123)"'
+      );
+
+      expect(
+        TrackerValidator.getMessage(
+          [
+            {
+              exception: 'github-only',
+              data: {
+                id: '123',
+                keyword: 'Resolves: #',
+                type: 'bugzilla',
+                url: 'https://bugzilla.redhat.com/show_bug.cgi?id=123',
+              },
+            },
+            {
+              exception: 'github-only',
+              data: {
+                id: '456',
+                keyword: 'Related: #',
+                type: 'bugzilla',
+                url: 'https://bugzilla.redhat.com/show_bug.cgi?id=456',
+              },
+            },
+            {
+              exception: 'github-only',
+            },
+          ],
+          'success',
+          false
+        )
+      ).toMatchInlineSnapshot(
+        '"[123](https://bugzilla.redhat.com/show_bug.cgi?id=123), [456](https://bugzilla.redhat.com/show_bug.cgi?id=456), github-only"'
+      );
+
+      expect(
+        TrackerValidator.getMessage(
+          [
+            {
+              exception: 'github-only',
+            },
+          ],
+          'success',
+          false
+        )
+      ).toMatchInlineSnapshot('"github-only"');
+
+      expect(
+        TrackerValidator.getMessage([], 'failure', true)
+      ).toMatchInlineSnapshot('"_no tracker_"');
     });
   });
 });

@@ -1,15 +1,13 @@
-import { Context } from 'probot';
 import { Commit } from '../../../../src/commit';
 import { Config } from '../../../../src/config';
+import { CustomOctokit } from '../../../../src/octokit';
 
-import { events } from '../../../../src/events';
 import { Validator } from '../../../../src/validation/validator';
 import {
   commitsWithMissingData,
   commitsWithTracker,
   commitsWithUpstream,
   commitsWithUpstreamAndTracker,
-  upstreamWithExceptionAndTrackerWithException,
 } from '../commit.fixture';
 
 export interface IValidatorTestContext {
@@ -34,6 +32,7 @@ const onlyTrackerPolicy = new Config({
     tracker: [
       {
         keyword: ['Resolves: #', 'Related: #'],
+        type: 'bugzilla',
         'issue-format': ['[0-9]+$'],
         url: 'https://bugzilla.redhat.com/show_bug.cgi?id=',
         exception: { note: ['github-only'] },
@@ -66,12 +65,14 @@ const systemdPolicy = new Config({
     tracker: [
       {
         keyword: ['Resolves: #', 'Related: #'],
+        type: 'bugzilla',
         'issue-format': ['[0-9]+$'],
         url: 'https://bugzilla.redhat.com/show_bug.cgi?id=',
         exception: { note: ['github-only'] },
       },
       {
         keyword: ['Resolves: ', 'Related: '],
+        type: 'jira',
         'issue-format': ['JIRA-1234+$'],
         url: 'https://issues.redhat.com/browse/',
         exception: { note: ['github-only'] },
@@ -81,22 +82,16 @@ const systemdPolicy = new Config({
 });
 
 const githubContext = {
-  octokit: {
-    repos: {
-      getCommit: () =>
-        Promise.resolve({
-          data: {
-            commit: { message: 'feat: add new feature' },
-            sha: 'upstream-sha',
-            html_url: 'upstream-url',
-          },
-          status: 200,
-        }),
-    },
-  },
-} as {
-  [K in keyof typeof events]: Context<(typeof events)[K][number]>;
-}[keyof typeof events];
+  request: (endpoint: any, request: any) =>
+    Promise.resolve({
+      data: {
+        commit: { message: 'feat: add new feature' },
+        sha: 'upstream-sha',
+        html_url: 'upstream-url',
+      },
+      status: 200,
+    }),
+} as CustomOctokit;
 
 const noPolicyValidator = new Validator(emptyPolicy, githubContext);
 const trackerValidator = new Validator(onlyTrackerPolicy, githubContext);

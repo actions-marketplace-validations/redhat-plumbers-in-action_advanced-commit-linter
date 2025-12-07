@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
 import { singleCommitMetadataSchema } from './input';
+import { configTrackerTypeSchema } from './config';
 
 const statusSchema = z.union([z.literal('success'), z.literal('failure')]);
-export type StatusT = z.infer<typeof statusSchema>;
+export type Status = z.infer<typeof statusSchema>;
 
 const trackerSchema = z.object({
   exception: z.string().optional(),
@@ -11,26 +12,29 @@ const trackerSchema = z.object({
     .object({
       keyword: z.string(),
       id: z.string(),
+      type: z.union([configTrackerTypeSchema, z.literal('unknown')]),
       url: z.string().optional(),
     })
     .optional(),
 });
 
-export type TrackerT = z.infer<typeof trackerSchema>;
+export type Tracker = z.infer<typeof trackerSchema>;
+
+export const upstreamDataSchema = z.object({
+  sha: z.string(),
+  repo: z.string(),
+  url: z.string(),
+});
+
+export type UpstreamData = z.infer<typeof upstreamDataSchema>;
 
 const upstreamSchema = z.object({
   status: statusSchema,
   exception: z.string().optional(),
-  data: z.array(
-    z.object({
-      sha: z.string(),
-      repo: z.string(),
-      url: z.string(),
-    })
-  ),
+  data: z.array(upstreamDataSchema),
 });
 
-export type UpstreamT = z.infer<typeof upstreamSchema>;
+export type Upstream = z.infer<typeof upstreamSchema>;
 
 const validatedCommitSchema = z.object({
   status: statusSchema,
@@ -45,13 +49,13 @@ const validatedCommitSchema = z.object({
   upstream: upstreamSchema.optional(),
 });
 
-export type ValidatedCommitT = z.infer<typeof validatedCommitSchema>;
+export type ValidatedCommit = z.infer<typeof validatedCommitSchema>;
 
 const outputCommitMetadataSchema = z.array(
   singleCommitMetadataSchema.extend({ validation: validatedCommitSchema })
 );
 
-export type OutputCommitMetadataT = z.infer<typeof outputCommitMetadataSchema>;
+export type OutputCommitMetadata = z.infer<typeof outputCommitMetadataSchema>;
 
 export const outputValidatedPullRequestMetadataSchema = z.object({
   validation: z.object({
@@ -59,6 +63,7 @@ export const outputValidatedPullRequestMetadataSchema = z.object({
     tracker: z
       .object({
         id: z.string().optional(),
+        type: z.union([configTrackerTypeSchema, z.literal('unknown')]),
         url: z.string().optional(),
         message: z.string(),
         exception: z.string().optional(),
@@ -69,6 +74,6 @@ export const outputValidatedPullRequestMetadataSchema = z.object({
   commits: outputCommitMetadataSchema,
 });
 
-export type OutputValidatedPullRequestMetadataT = z.infer<
+export type OutputValidatedPullRequestMetadata = z.infer<
   typeof outputValidatedPullRequestMetadataSchema
 >;

@@ -1,19 +1,17 @@
-import { Context } from 'probot';
-import { Commit } from '../commit';
-import { Config } from '../config';
-
-import { events } from '../events';
-
-import { SingleCommitMetadataT } from '../schema/input';
-
 import {
-  OutputValidatedPullRequestMetadataT,
-  TrackerT,
-  ValidatedCommitT,
-  StatusT,
+  OutputValidatedPullRequestMetadata,
+  Tracker,
+  ValidatedCommit,
+  Status,
 } from '../schema/output';
 import { TrackerValidator } from './tracker-validator';
 import { UpstreamValidator } from './upstream-validator';
+
+import { Commit } from '../commit';
+import { Config } from '../config';
+import { CustomOctokit } from '../octokit';
+
+import { SingleCommitMetadata } from '../schema/input';
 
 export class Validator {
   trackerValidator: TrackerValidator[];
@@ -21,9 +19,7 @@ export class Validator {
 
   constructor(
     readonly config: Config,
-    readonly context: {
-      [K in keyof typeof events]: Context<(typeof events)[K][number]>;
-    }[keyof typeof events]
+    readonly octokit: CustomOctokit
   ) {
     this.trackerValidator = this.config.tracker.map(
       config => new TrackerValidator(config)
@@ -36,9 +32,9 @@ export class Validator {
 
   validateAll(
     validatedCommits: Commit[]
-  ): OutputValidatedPullRequestMetadataT['validation'] {
+  ): OutputValidatedPullRequestMetadata['validation'] {
     const tracker = this.generalTracker(validatedCommits);
-    const status = this.overallStatus(tracker /*, validatedCommits*/);
+    const status = this.overallStatus(tracker, validatedCommits);
     const message = this.overallMessage(tracker, validatedCommits);
 
     return {
@@ -49,9 +45,9 @@ export class Validator {
   }
 
   async validateCommit(
-    commitMetadata: SingleCommitMetadataT
-  ): Promise<ValidatedCommitT> {
-    const validated: ValidatedCommitT = {
+    commitMetadata: SingleCommitMetadata
+  ): Promise<ValidatedCommit> {
+    const validated: ValidatedCommit = {
       status: 'failure',
       message: '',
     };
@@ -78,7 +74,7 @@ export class Validator {
 
     validated.upstream = await this.upstreamValidator.validate(
       commitMetadata,
-      this.context
+      this.octokit
     );
     const { status, message } = this.validationSummary(
       validated,
@@ -96,18 +92,18 @@ export class Validator {
   }
 
   validationSummary(
-    data: ValidatedCommitT,
+    data: ValidatedCommit,
     commitTitle: string,
     commitUrl: string
-  ): Pick<ValidatedCommitT, 'status' | 'message'> {
-    let status: StatusT = 'failure';
-    const upstreamSummary = this.upstreamValidator.summary(data.upstream);
-
-    status = upstreamSummary.status;
+  ): Pick<ValidatedCommit, 'status' | 'message'> {
+    const upstreamSummary = this.upstreamValidator.summary(data, {
+      upstream: !this.config.isCherryPickPolicyEmpty(),
+      tracker: !this.config.isTrackerPolicyEmpty(),
+    });
 
     return {
-      status,
-      message: `${commitUrl} - ${commitTitle} - ${upstreamSummary.message}`,
+      status: upstreamSummary.status,
+      message: `| ${commitUrl} - _${commitTitle}_ | ${upstreamSummary.message} |`,
     };
   }
 
@@ -116,22 +112,21 @@ export class Validator {
   // ! get unique tracker of PR
   // ! when commit is marked by exception and commit with tracker exist return only tracker othervise return exception
   // ! when multiple trackers exist return error???
-
   generalTracker(
     commitsMetadata: Commit[]
-  ): OutputValidatedPullRequestMetadataT['validation']['tracker'] {
+  ): OutputValidatedPullRequestMetadata['validation']['tracker'] {
     if (this.config.isTrackerPolicyEmpty()) return undefined;
 
-    const tracker: OutputValidatedPullRequestMetadataT['validation']['tracker'] =
-      { message: '' };
+    const tracker: OutputValidatedPullRequestMetadata['validation']['tracker'] =
+      { message: '', type: 'unknown' };
 
-    const prUniqueTracker: TrackerT[] = [];
+    const prUniqueTracker: Tracker[] = [];
     for (const { validation } of commitsMetadata) {
       if (
         validation.tracker === undefined ||
         validation.tracker.data.length === 0
       ) {
-        tracker.message = 'No tracker found';
+        tracker.message = '**Missing issue tracker ✋**';
         return tracker;
       }
 
@@ -140,7 +135,7 @@ export class Validator {
         return tracker;
       }
 
-      const uniqueTracker: TrackerT[] = [];
+      const uniqueTracker: Tracker[] = [];
       for (const tracker of validation.tracker.data) {
         const isDuplicate = uniqueTracker.find(
           obj => obj.data?.id === tracker.data?.id
@@ -177,8 +172,8 @@ export class Validator {
     }
 
     return {
-      ...tracker,
       id: prUniqueTracker[0].data?.id,
+      type: prUniqueTracker[0].data?.type ?? 'unknown',
       url: prUniqueTracker[0].data?.url,
       message: 'Tracker found',
       exception: prUniqueTracker[0].exception,
@@ -186,42 +181,73 @@ export class Validator {
   }
 
   overallMessage(
-    tracker: OutputValidatedPullRequestMetadataT['validation']['tracker'],
+    tracker: OutputValidatedPullRequestMetadata['validation']['tracker'],
     commitsMetadata: Commit[]
   ): string {
-    let trackerID = 'Missing, needs inspection! ✋';
+    let trackerID = '**Missing, needs inspection! ✋**';
 
-    if (tracker !== undefined) {
+    // ! FIXME: This is duplication of code from TrackerValidator.getMessage() and should be refactored
+    if (tracker) {
       if (!tracker?.id && !tracker?.exception) {
         trackerID = tracker.message;
-      } else if (tracker?.id === '' && tracker?.exception) {
+      } else if (!tracker?.id && tracker?.exception) {
         trackerID = `\`${tracker.exception}\``;
-      } else if (tracker?.id !== '') {
+      } else if (tracker?.id) {
         trackerID = `[${tracker.id}](${tracker.url})`;
       }
     }
 
-    const commits = `${commitsMetadata
-      .map(commit => {
-        return commit.validation.message;
-      })
-      .join('\n')}`;
+    const validCommits = Commit.getValidCommits(commitsMetadata);
+    const invalidCommits = Commit.getInvalidCommits(commitsMetadata);
 
-    // TODO: separate commits by their status
-    // The following commits needs inspection
-    // The following commits meets all requirements
-    return `Tracker - ${trackerID}\n\n${commits}`;
+    let summaryMessage = `Tracker - ${trackerID}`;
+    if (validCommits.length > 0) {
+      summaryMessage += '\n\n';
+      summaryMessage += '#### The following commits meet all requirements';
+      summaryMessage += '\n\n';
+      summaryMessage += '| commit | upstream |\n';
+      summaryMessage += '|---|---|\n';
+      summaryMessage += `${Commit.getListOfCommits(validCommits)}`;
+    }
+
+    if (invalidCommits.length > 0) {
+      summaryMessage += '\n\n';
+      summaryMessage += '#### The following commits need an inspection';
+      summaryMessage += '\n\n';
+      summaryMessage += '| commit | note |\n';
+      summaryMessage += '|---|---|\n';
+      summaryMessage += `${Commit.getListOfCommits(invalidCommits)}`;
+    }
+
+    return summaryMessage;
   }
 
   overallStatus(
-    tracker: OutputValidatedPullRequestMetadataT['validation']['tracker']
-    // commitsMetadata: OutputCommitMetadataT
-  ) {
-    let status: StatusT = 'failure';
+    tracker: OutputValidatedPullRequestMetadata['validation']['tracker'],
+    commitsMetadata: Commit[]
+  ): Status {
+    if (!this.config.isTrackerPolicyEmpty()) {
+      if (tracker === undefined) {
+        return 'failure';
+      }
 
-    if (tracker) {
-      status = 'success';
+      if (!tracker?.id && !tracker?.exception) {
+        return 'failure';
+      }
+
+      if (tracker?.id === '' && tracker?.exception) {
+        return 'failure';
+      }
     }
-    return status;
+
+    if (!this.config.isCherryPickPolicyEmpty()) {
+      commitsMetadata.forEach(commit => {
+        if (commit.validation.upstream?.status === 'failure') {
+          return 'failure';
+        }
+      });
+    }
+
+    return 'success';
   }
 }

@@ -1,17 +1,15 @@
 import { Validator } from './validation/validator';
 
-import { SingleCommitMetadataT } from './schema/input';
-import { OutputCommitMetadataT, ValidatedCommitT } from './schema/output';
+import { SingleCommitMetadata } from './schema/input';
+import { OutputCommitMetadata, ValidatedCommit } from './schema/output';
 
 export class Commit {
-  validation: ValidatedCommitT = {
+  validation: ValidatedCommit = {
     status: 'failure',
     message: '',
-    tracker: undefined,
-    upstream: undefined,
   };
 
-  constructor(readonly metadata: SingleCommitMetadataT) {}
+  constructor(readonly metadata: SingleCommitMetadata) {}
 
   async validate(validator: Validator): Promise<Commit> {
     this.validation = await validator.validateCommit(this.metadata);
@@ -19,7 +17,7 @@ export class Commit {
     return this;
   }
 
-  get validated(): OutputCommitMetadataT[number] {
+  get validated(): OutputCommitMetadata[number] {
     return {
       ...this.metadata,
       validation: this.validation,
@@ -32,5 +30,17 @@ export class Commit {
 
   haveUpstream(): boolean {
     return this.validation.upstream !== undefined;
+  }
+
+  static getValidCommits(commits: Commit[]): Commit[] {
+    return commits.filter(commit => commit.validation.status === 'success');
+  }
+
+  static getInvalidCommits(commits: Commit[]): Commit[] {
+    return commits.filter(commit => commit.validation.status === 'failure');
+  }
+
+  static getListOfCommits(commits: Commit[]): string {
+    return commits.map(commit => commit.validation.message).join('\n');
   }
 }
