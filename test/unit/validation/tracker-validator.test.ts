@@ -4,7 +4,7 @@ import {
   ITrackerValidatorTestContext,
   trackerValidatorContextFixture,
 } from '../fixtures/validation/tracker-validator.fixture';
-import { TrackerValidator } from '../../../src/validation/tracker-validator';
+import { Validator } from '../../../src/validation/validator';
 
 describe('Tracker Validator Object', () => {
   beforeEach<ITrackerValidatorTestContext>(context => {
@@ -26,6 +26,7 @@ describe('Tracker Validator Object', () => {
             title: 'commit title',
             body: 'commit title',
             cherryPick: [],
+            revert: [],
           },
         })
       ).toMatchInlineSnapshot(`
@@ -44,6 +45,7 @@ describe('Tracker Validator Object', () => {
             title: 'commit title',
             body: 'commit title\n\nResolves: #789',
             cherryPick: [],
+            revert: [],
           },
         })
       ).toMatchInlineSnapshot(`
@@ -68,6 +70,7 @@ describe('Tracker Validator Object', () => {
             title: 'commit title',
             body: 'commit title\n\ngithub-only',
             cherryPick: [],
+            revert: [],
           },
         })
       ).toMatchInlineSnapshot(`
@@ -86,6 +89,7 @@ describe('Tracker Validator Object', () => {
             title: 'commit title',
             body: 'commit title\n\ngithub-only\n\nResolves: #789',
             cherryPick: [],
+            revert: [],
           },
         })
       ).toMatchInlineSnapshot(`
@@ -103,7 +107,7 @@ describe('Tracker Validator Object', () => {
 
     test('cleanArray()', context => {
       expect(
-        TrackerValidator.cleanArray({
+        Validator.cleanTrackerArray({
           message: 'message',
           status: 'success',
           data: [
@@ -187,11 +191,11 @@ describe('Tracker Validator Object', () => {
 
     test('getMessage()', context => {
       expect(
-        TrackerValidator.getMessage([], 'failure', false)
+        Validator.getTrackerMessage([], 'failure', false)
       ).toMatchInlineSnapshot('"**Missing issue tracker** ✋"');
 
       expect(
-        TrackerValidator.getMessage(
+        Validator.getTrackerMessage(
           [
             {
               exception: 'github-only',
@@ -211,7 +215,7 @@ describe('Tracker Validator Object', () => {
       );
 
       expect(
-        TrackerValidator.getMessage(
+        Validator.getTrackerMessage(
           [
             {
               exception: 'github-only',
@@ -243,7 +247,7 @@ describe('Tracker Validator Object', () => {
       );
 
       expect(
-        TrackerValidator.getMessage(
+        Validator.getTrackerMessage(
           [
             {
               exception: 'github-only',
@@ -255,7 +259,7 @@ describe('Tracker Validator Object', () => {
       ).toMatchInlineSnapshot('"github-only"');
 
       expect(
-        TrackerValidator.getMessage([], 'failure', true)
+        Validator.getTrackerMessage([], 'failure', true)
       ).toMatchInlineSnapshot('"_no tracker_"');
     });
   });
